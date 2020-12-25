@@ -1,0 +1,72 @@
+:root{
+  --dark-purple: rgba(33, 11, 46, 1);
+  --dark-dark-purple: rgba(20,6,28,1);
+  --darkest-dark-purple: rgba(12,1,18,1);
+  --ruby-red: rgba(159, 29, 25, 1);
+  --bright-yellow-crayola: rgba(252, 171, 16, 1);
+  --middle-blue: rgba(146, 220, 229, 1);
+  --cultured: rgba(248, 247, 249, 1);
+}
+
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: "PT Sans", sans-serif;
+}
+
+html, body {
+  background-color: var(--cultured);
+  min-height: 100vh;
+}
+
+#index {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.home,
+.services,
+.products,
+.sign-up {
+  background-color: var(--cultured);
+    flex: 1;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+}
+
+.services {
+  /* background-image: url("/images/img-2.jpg"); */
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  color: #fff;
+  font-size: 100px;
+}
+
+.products {
+  /* background-image: url("/images/img-1.jpg"); */
+  background-position: center;
+  background-size: fill;
+  background-repeat: no-repeat;
+  color: #fff;
+  font-size: 100px;
+}
+
+.sign-up {
+  /* background-image: url("/images/img-8.jpg"); */
+  background-color: #242424;
+  /* background-position: center; */
+  background-size: cover;
+  /* background-repeat: no-repeat; */
+  color: #fff;
+  font-size: 100px;
+}
+
+.logo-1 {
+  height: 80px;
+}
+
