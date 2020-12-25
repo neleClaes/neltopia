@@ -39,7 +39,6 @@ function Register() {
     });
 
     const handleUser = (data) => {
-        console.log(data);
         SetUserRegistration(data);
     }
 

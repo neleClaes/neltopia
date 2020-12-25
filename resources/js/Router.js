@@ -3,6 +3,8 @@ import { BrowserRouter, Link, Redirect, Route, Switch } from 'react-router-dom';
 import Home from './views/Home/Home';
 import Login from './views/Auth/Login/Login';
 import Register from './views/Auth/Register/Register';
+import EmailVerify from './views/Auth/Email/EmailVerify';
+import Dashboard from './views/User/Dashboard/Dashboard';
 import { User_Logout } from './api/User';
 
 const checkAppState = () => {
@@ -31,10 +33,10 @@ const Main = props => (
             {checkAppState().isLoggedIn ? <User_Logout /> : <Redirect to="/login" />}
         </Route>
         {/* User is LoggedIn*/}
-        {/* <Route path='/email-verify' component={EmailVerify} />
+        <Route path='/email-verify' component={EmailVerify} />
         <Route path='/dashboard'>
-            {(checkAppState().hasEmailVerified && checkAppState().isLoggedIn) ? <Dashboard /> : <Redirect to="/" />}
-        </Route> */}
+            {(/*checkAppState().hasEmailVerified &&*/ checkAppState().isLoggedIn) ? <Dashboard /> : <Redirect to="/" />}
+        </Route>
         {/*Page Not Found*/}
         {/* <Route path='/not-found' component={NotFound} /> */}
     </Switch>

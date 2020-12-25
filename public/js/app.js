@@ -124760,7 +124760,11 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _views_Home_Home__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./views/Home/Home */ "./resources/js/views/Home/Home.js");
 /* harmony import */ var _views_Auth_Login_Login__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./views/Auth/Login/Login */ "./resources/js/views/Auth/Login/Login.js");
 /* harmony import */ var _views_Auth_Register_Register__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./views/Auth/Register/Register */ "./resources/js/views/Auth/Register/Register.js");
-/* harmony import */ var _api_User__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./api/User */ "./resources/js/api/User.js");
+/* harmony import */ var _views_Auth_Email_EmailVerify__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./views/Auth/Email/EmailVerify */ "./resources/js/views/Auth/Email/EmailVerify.js");
+/* harmony import */ var _views_User_Dashboard_Dashboard__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./views/User/Dashboard/Dashboard */ "./resources/js/views/User/Dashboard/Dashboard.js");
+/* harmony import */ var _api_User__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./api/User */ "./resources/js/api/User.js");
+
+
 
 
 
@@ -124792,8 +124796,17 @@ var Main = function Main(props) {
     to: "/"
   })), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement(react_router_dom__WEBPACK_IMPORTED_MODULE_1__["Route"], {
     path: "/logout"
-  }, checkAppState().isLoggedIn ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement(_api_User__WEBPACK_IMPORTED_MODULE_5__["User_Logout"], null) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement(react_router_dom__WEBPACK_IMPORTED_MODULE_1__["Redirect"], {
+  }, checkAppState().isLoggedIn ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement(_api_User__WEBPACK_IMPORTED_MODULE_7__["User_Logout"], null) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement(react_router_dom__WEBPACK_IMPORTED_MODULE_1__["Redirect"], {
     to: "/login"
+  })), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement(react_router_dom__WEBPACK_IMPORTED_MODULE_1__["Route"], {
+    path: "/email-verify",
+    component: _views_Auth_Email_EmailVerify__WEBPACK_IMPORTED_MODULE_5__["default"]
+  }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement(react_router_dom__WEBPACK_IMPORTED_MODULE_1__["Route"], {
+    path: "/dashboard"
+  },
+  /*checkAppState().hasEmailVerified &&*/
+  checkAppState().isLoggedIn ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement(_views_User_Dashboard_Dashboard__WEBPACK_IMPORTED_MODULE_6__["default"], null) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement(react_router_dom__WEBPACK_IMPORTED_MODULE_1__["Redirect"], {
+    to: "/"
   })));
 };
 
@@ -124861,13 +124874,14 @@ var CheckPwd = /*#__PURE__*/function () {
 /*!**********************************!*\
   !*** ./resources/js/api/User.js ***!
   \**********************************/
-/*! exports provided: User_Registration, User_Login, User_Logout */
+/*! exports provided: User_Registration, User_Login, User_Update, User_Logout */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "User_Registration", function() { return User_Registration; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "User_Login", function() { return User_Login; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "User_Update", function() { return User_Update; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "User_Logout", function() { return User_Logout; });
 /* harmony import */ var _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @babel/runtime/regenerator */ "./node_modules/@babel/runtime/regenerator/index.js");
 /* harmony import */ var _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0__);
@@ -125039,22 +125053,121 @@ var User_Login = /*#__PURE__*/function () {
     return _ref5.apply(this, arguments);
   };
 }();
-var User_Logout = /*#__PURE__*/function () {
-  var _ref7 = _asyncToGenerator( /*#__PURE__*/_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default.a.mark(function _callee7() {
-    var res, appState;
-    return _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default.a.wrap(function _callee7$(_context7) {
+var User_Update = /*#__PURE__*/function () {
+  var _ref7 = _asyncToGenerator( /*#__PURE__*/_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default.a.mark(function _callee10(getUserInfo, user) {
+    return _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default.a.wrap(function _callee10$(_context10) {
       while (1) {
-        switch (_context7.prev = _context7.next) {
+        switch (_context10.prev = _context10.next) {
           case 0:
-            _context7.prev = 0;
-            _context7.next = 3;
+            window.axios.defaults.withCredentials = true;
+            window.axios.get('sanctum/crf-cookie').then( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default.a.mark(function _callee9() {
+              return _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default.a.wrap(function _callee9$(_context9) {
+                while (1) {
+                  switch (_context9.prev = _context9.next) {
+                    case 0:
+                      bcryptjs__WEBPACK_IMPORTED_MODULE_1___default.a.genSalt(10, /*#__PURE__*/function () {
+                        var _ref9 = _asyncToGenerator( /*#__PURE__*/_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default.a.mark(function _callee8(err, salt) {
+                          return _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default.a.wrap(function _callee8$(_context8) {
+                            while (1) {
+                              switch (_context8.prev = _context8.next) {
+                                case 0:
+                                  bcryptjs__WEBPACK_IMPORTED_MODULE_1___default.a.hash(user.password, salt, /*#__PURE__*/function () {
+                                    var _ref10 = _asyncToGenerator( /*#__PURE__*/_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default.a.mark(function _callee7(err, hash) {
+                                      var res;
+                                      return _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default.a.wrap(function _callee7$(_context7) {
+                                        while (1) {
+                                          switch (_context7.prev = _context7.next) {
+                                            case 0:
+                                              user.password = hash;
+                                              _context7.prev = 1;
+                                              _context7.next = 4;
+                                              return window.axios({
+                                                method: 'post',
+                                                url: 'api/v1/auth/update',
+                                                data: {
+                                                  id: user.id,
+                                                  username: user.username,
+                                                  email: user.email,
+                                                  password: user.password
+                                                }
+                                              });
+
+                                            case 4:
+                                              res = _context7.sent;
+                                              getUserInfo(res);
+                                              _context7.next = 12;
+                                              break;
+
+                                            case 8:
+                                              _context7.prev = 8;
+                                              _context7.t0 = _context7["catch"](1);
+                                              console.log(_context7.t0);
+                                              getUserInfo(_context7.t0);
+
+                                            case 12:
+                                            case "end":
+                                              return _context7.stop();
+                                          }
+                                        }
+                                      }, _callee7, null, [[1, 8]]);
+                                    }));
+
+                                    return function (_x13, _x14) {
+                                      return _ref10.apply(this, arguments);
+                                    };
+                                  }());
+
+                                case 1:
+                                case "end":
+                                  return _context8.stop();
+                              }
+                            }
+                          }, _callee8);
+                        }));
+
+                        return function (_x11, _x12) {
+                          return _ref9.apply(this, arguments);
+                        };
+                      }());
+
+                    case 1:
+                    case "end":
+                      return _context9.stop();
+                  }
+                }
+              }, _callee9);
+            })))["catch"](function (err) {
+              return console.log(err);
+            });
+
+          case 2:
+          case "end":
+            return _context10.stop();
+        }
+      }
+    }, _callee10);
+  }));
+
+  return function User_Update(_x9, _x10) {
+    return _ref7.apply(this, arguments);
+  };
+}();
+var User_Logout = /*#__PURE__*/function () {
+  var _ref11 = _asyncToGenerator( /*#__PURE__*/_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default.a.mark(function _callee11() {
+    var res, appState;
+    return _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default.a.wrap(function _callee11$(_context11) {
+      while (1) {
+        switch (_context11.prev = _context11.next) {
+          case 0:
+            _context11.prev = 0;
+            _context11.next = 3;
             return window.axios({
               method: 'get',
               url: 'api/v1/auth/logout'
             });
 
           case 3:
-            res = _context7.sent;
+            res = _context11.sent;
 
             if (res.data.succes) {
               appState = {
@@ -125073,24 +125186,24 @@ var User_Logout = /*#__PURE__*/function () {
               location.replace('./');
             }
 
-            _context7.next = 10;
+            _context11.next = 10;
             break;
 
           case 7:
-            _context7.prev = 7;
-            _context7.t0 = _context7["catch"](0);
+            _context11.prev = 7;
+            _context11.t0 = _context11["catch"](0);
             location.replace('./');
 
           case 10:
           case "end":
-            return _context7.stop();
+            return _context11.stop();
         }
       }
-    }, _callee7, null, [[0, 7]]);
+    }, _callee11, null, [[0, 7]]);
   }));
 
   return function User_Logout() {
-    return _ref7.apply(this, arguments);
+    return _ref11.apply(this, arguments);
   };
 }();
 
@@ -125296,7 +125409,7 @@ function Form(_ref) {
 
   if (Object.keys(values).length === 0) {
     inputs.map(function (input) {
-      values[input.name] = "";
+      values[input.name] = input.value;
     });
   }
 
@@ -125311,7 +125424,7 @@ function Form(_ref) {
           switch (_context.prev = _context.next) {
             case 0:
               e.preventDefault();
-              _context.t0 = name == "login" || name == "registration";
+              _context.t0 = name == "login" || name == "registration" || name == "update";
 
               if (!_context.t0) {
                 _context.next = 8;
@@ -125359,7 +125472,7 @@ function Form(_ref) {
   }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement("button", {
     className: "form-input-btn",
     type: "submit"
-  }, button), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement("span", {
+  }, button), link && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement("span", {
     className: "form-input-login"
   }, link, " ", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement("a", {
     href: linkTo
@@ -125381,12 +125494,30 @@ function Form(_ref) {
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+function _slicedToArray(arr, i) { return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _unsupportedIterableToArray(arr, i) || _nonIterableRest(); }
+
+function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+
+function _unsupportedIterableToArray(o, minLen) { if (!o) return; if (typeof o === "string") return _arrayLikeToArray(o, minLen); var n = Object.prototype.toString.call(o).slice(8, -1); if (n === "Object" && o.constructor) n = o.constructor.name; if (n === "Map" || n === "Set") return Array.from(o); if (n === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)) return _arrayLikeToArray(o, minLen); }
+
+function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len = arr.length; for (var i = 0, arr2 = new Array(len); i < len; i++) { arr2[i] = arr[i]; } return arr2; }
+
+function _iterableToArrayLimit(arr, i) { if (typeof Symbol === "undefined" || !(Symbol.iterator in Object(arr))) return; var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"] != null) _i["return"](); } finally { if (_d) throw _e; } } return _arr; }
+
+function _arrayWithHoles(arr) { if (Array.isArray(arr)) return arr; }
+
 
 
 function Input(_ref) {
   var input = _ref.input,
       error = _ref.error,
       _onChange = _ref.onChange;
+
+  var _useState = Object(react__WEBPACK_IMPORTED_MODULE_0__["useState"])(input.value),
+      _useState2 = _slicedToArray(_useState, 2),
+      value = _useState2[0],
+      setValue = _useState2[1];
+
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("div", {
     className: "form-inputs"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("label", {
@@ -125397,9 +125528,12 @@ function Input(_ref) {
     type: input.type,
     name: input.name,
     className: "form-input",
+    value: value,
     placeholder: input.placeholder,
     onChange: function onChange(event) {
-      return _onChange(event);
+      _onChange(event);
+
+      setValue(event.target.value);
     }
   }), error && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("p", null, error));
 }
@@ -125482,7 +125616,7 @@ function _validateInfo() {
           case 0:
             errors = {};
 
-            if (!(name == "registration")) {
+            if (!(name == "registration" || name == "update")) {
               _context.next = 23;
               break;
             }
@@ -125736,6 +125870,7 @@ var Navbar = function Navbar(props) {
     switch (path) {
       case '/': // case '/IT-products':
 
+      case '/dashboard':
       case '/login':
       case '/register':
         return [{
@@ -125744,9 +125879,12 @@ var Navbar = function Navbar(props) {
         }, {
           "to": "/blog",
           "name": "Blog"
-        }
+        },
         /*{ "to": "/IT-products", "name": "IT Products" }*/
-        ];
+        checkAppState().isLoggedIn && {
+          'to': '/dashboard',
+          'name': "Dashboard"
+        }];
 
       case '/blog':
       case '/hobbies':
@@ -125760,12 +125898,6 @@ var Navbar = function Navbar(props) {
         }, {
           "to": "/IT",
           "name": "IT"
-        }];
-
-      case '/dashboard':
-        return [{
-          "to": "/",
-          "name": "Home"
         }];
     }
   };
@@ -125855,6 +125987,27 @@ var Button = function Button(_ref) {
 };
 
 /* harmony default export */ __webpack_exports__["default"] = (Button);
+
+/***/ }),
+
+/***/ "./resources/js/views/Auth/Email/EmailVerify.js":
+/*!******************************************************!*\
+  !*** ./resources/js/views/Auth/Email/EmailVerify.js ***!
+  \******************************************************/
+/*! exports provided: default */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+
+
+function EmailVerify() {
+  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("h1", null, "Your Email needs to be verified before entering the content page"));
+}
+
+/* harmony default export */ __webpack_exports__["default"] = (EmailVerify);
 
 /***/ }),
 
@@ -126052,7 +126205,6 @@ function Register() {
   });
 
   var handleUser = function handleUser(data) {
-    console.log(data);
     SetUserRegistration(data);
   };
 
@@ -126122,6 +126274,149 @@ function Home() {
 }
 
 /* harmony default export */ __webpack_exports__["default"] = (Home);
+
+/***/ }),
+
+/***/ "./resources/js/views/User/Dashboard/Dashboard.js":
+/*!********************************************************!*\
+  !*** ./resources/js/views/User/Dashboard/Dashboard.js ***!
+  \********************************************************/
+/*! exports provided: default */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _components_Form_Form__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../components/Form/Form */ "./resources/js/components/Form/Form.js");
+/* harmony import */ var _api_User__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../api/User */ "./resources/js/api/User.js");
+function _slicedToArray(arr, i) { return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _unsupportedIterableToArray(arr, i) || _nonIterableRest(); }
+
+function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+
+function _unsupportedIterableToArray(o, minLen) { if (!o) return; if (typeof o === "string") return _arrayLikeToArray(o, minLen); var n = Object.prototype.toString.call(o).slice(8, -1); if (n === "Object" && o.constructor) n = o.constructor.name; if (n === "Map" || n === "Set") return Array.from(o); if (n === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)) return _arrayLikeToArray(o, minLen); }
+
+function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len = arr.length; for (var i = 0, arr2 = new Array(len); i < len; i++) { arr2[i] = arr[i]; } return arr2; }
+
+function _iterableToArrayLimit(arr, i) { if (typeof Symbol === "undefined" || !(Symbol.iterator in Object(arr))) return; var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"] != null) _i["return"](); } finally { if (_d) throw _e; } } return _arr; }
+
+function _arrayWithHoles(arr) { if (Array.isArray(arr)) return arr; }
+
+
+
+
+
+var DashBoard = function DashBoard() {
+  var _useState = Object(react__WEBPACK_IMPORTED_MODULE_0__["useState"])(false),
+      _useState2 = _slicedToArray(_useState, 2),
+      isUpdate = _useState2[0],
+      setIsUpdate = _useState2[1];
+
+  var _useState3 = Object(react__WEBPACK_IMPORTED_MODULE_0__["useState"])(false),
+      _useState4 = _slicedToArray(_useState3, 2),
+      showForm = _useState4[0],
+      setShowForm = _useState4[1];
+
+  var _useState5 = Object(react__WEBPACK_IMPORTED_MODULE_0__["useState"])(""),
+      _useState6 = _slicedToArray(_useState5, 2),
+      error = _useState6[0],
+      SetError = _useState6[1];
+
+  var _useState7 = Object(react__WEBPACK_IMPORTED_MODULE_0__["useState"])({}),
+      _useState8 = _slicedToArray(_useState7, 2),
+      userUpdate = _useState8[0],
+      SetUserUpdate = _useState8[1];
+
+  var checkAppState = function checkAppState() {
+    var AppState = JSON.parse(localStorage["appState"]);
+    return {
+      isLoggedIn: AppState.isLoggedIn,
+      user: AppState.user,
+      hasEmailVerified: AppState.hasEmailVerified
+    };
+  };
+
+  var getUserInfo = function getUserInfo(res) {
+    console.log(res);
+
+    if (res.data.succes) {
+      var appState = {
+        isLoggedIn: true,
+        user: {
+          id: userUpdate.id,
+          name: userUpdate.username,
+          email: userUpdate.email
+        },
+        hasEmailVerified: checkAppState.hasEmailVerified
+      };
+      localStorage["appState"] = JSON.stringify(appState);
+      location.reload();
+    } else {
+      SetError(res.data.error);
+      SetUserUpdate({});
+    }
+  };
+
+  var handleUpdate = function handleUpdate() {
+    setShowForm(true);
+  };
+
+  var handleUser = function handleUser(data) {
+    if (Object.keys(userUpdate).length == 0) {
+      var user = {
+        id: checkAppState().user.id,
+        username: data.username,
+        email: data.email,
+        password: data.password
+      };
+      console.log(user);
+      Object(_api_User__WEBPACK_IMPORTED_MODULE_2__["User_Update"])(getUserInfo, user);
+      SetUserUpdate(user);
+    }
+  };
+
+  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("div", {
+    className: "form-container"
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("div", {
+    className: "form-content-left"
+  }, error && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("p", null, error), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("table", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("tbody", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("tr", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("th", {
+    scope: "row "
+  }, "Username"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("td", null, checkAppState().user.name)), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("tr", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("th", {
+    scope: "row "
+  }, "Email"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("td", null, checkAppState().user.email)))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("button", {
+    onClick: handleUpdate
+  }, "Update User Data")), showForm && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement(_components_Form_Form__WEBPACK_IMPORTED_MODULE_1__["default"], {
+    handleUser: handleUser,
+    name: "update",
+    title: "Update User Data",
+    inputs: [{
+      'label': 'Username:',
+      'name': 'username',
+      "type": 'text',
+      'value': checkAppState().user.name
+    }, {
+      'label': 'Email:',
+      'name': 'email',
+      "type": 'email',
+      'value': checkAppState().user.email
+    }, {
+      'label': 'Password:',
+      'name': 'password',
+      "type": 'password',
+      'placeholder': 'Enter your password'
+    }, {
+      'label': 'Confirm Password:',
+      'name': 'confirm_password',
+      "type": 'password',
+      'placeholder': 'Enter your password'
+    }],
+    button: "Update",
+    link: false,
+    linkTo: false
+  }));
+};
+
+/* harmony default export */ __webpack_exports__["default"] = (DashBoard);
 
 /***/ }),
 

@@ -4,7 +4,7 @@ import { CheckPwd } from '../../api/CheckPwd'
 export default async function validateInfo(name, values) {
     let errors = {};
 
-    if (name == "registration") {
+    if (name == "registration" || name == "update") {
         if (!values.username.trim()) {
             errors.username = 'Username required';
         } else if (!/^[A-Za-z0-9]+$/.test(values.username.trim())) {

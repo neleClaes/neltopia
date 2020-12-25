@@ -17,31 +17,39 @@ class UserController extends Controller
     {
         try {
             // $this->validator($request->all())->validate();
-            $credentials = $request->only('username', 'email', 'password');
+            $checkUser = User::Where('email', $request->only('email'))->orWhere('name', $request->only('username'));
+            if (!$checkUser->count()) {
+                $credentials = $request->only('username', 'email', 'password');
 
-            $user = User::create([
-                'name' => $credentials['username'],
-                'email' => $credentials['email'],
-                'password' => $credentials['password']
-            ]);
+                $user = User::create([
+                    'name' => $credentials['username'],
+                    'email' => $credentials['email'],
+                    'password' => $credentials['password']
+                ]);
 
-            $user->save();
-            $user->sendEmailVerificationNotification();
+                $user->save();
+                $user->sendEmailVerificationNotification();
 
-            return response()->json([
-                'succes' => true,
-                'user' => ([
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    // 'email_verified_at' => $user->email_verified_at,
-                ])
-            ], 201);
+                return response()->json([
+                    'succes' => true,
+                    'user' => ([
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        // 'email_verified_at' => $user->email_verified_at,
+                    ])
+                ]);
+            } else {
+                return response()->json([
+                    'succes' => false,
+                    'error' => "User name and/or email is already registerd!"
+                ]);
+            }
         } catch (Exception $e) {
             return response()->json([
                 'succes' => false,
                 'error' => $e->getMessage()
-            ], 500);
+            ]);
         }
     }
     /**
@@ -96,12 +104,12 @@ class UserController extends Controller
                         'email' => $authuser->email,
                         'email_verified_at' => $authuser->email_verified_at,
                     ])
-                ], 201);
+                ]);
             } else {
                 return response()->json([
                     'succes' => false,
                     'error' => 'User not found'
-                ], 404);
+                ]);
             }
         } else {
             if (Auth::attempt(['name' => $credentials['username'], 'password' =>  $credentials['password']])) {
@@ -116,13 +124,39 @@ class UserController extends Controller
                         'email' => $authuser->email,
                         'email_verified_at' => $authuser->email_verified_at,
                     ])
-                ], 201);
+                ]);
             } else {
                 return response()->json([
                     'succes' => false,
                     'error' => 'User not found'
-                ], 404);
+                ]);
             }
+        }
+    }
+
+    public function update(Request $request)
+    {
+        try {
+
+            $checkUser = User::Where('email', '=', $request->only('email'))->Where('id', '!=', $request->only('id'))->orWhere('name', '=', $request->only('username'))->Where('id', '!=', $request->only('id'))->get();
+            if (!$checkUser->count()) {
+                $credentials = $request->only('username', 'email', 'password');
+                User::Where('id', $request->only('id'))->update(['name' => $credentials["username"], 'email' => $credentials["email"], 'password' => $credentials["password"]]);
+
+                return response()->json([
+                    'succes' => true
+                ]);
+            } else {
+                return response()->json([
+                    'succes' => false,
+                    'error' => "User name and/or email is already in use by another user!"
+                ]);
+            }
+        } catch (Exception $e) {
+            return response()->json([
+                'succes' => false,
+                'error' => $e->getMessage()
+            ]);
         }
     }
 

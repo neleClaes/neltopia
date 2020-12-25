@@ -33,15 +33,14 @@ const Navbar = (props) => {
         switch (path) {
             case '/':
             // case '/IT-products':
+            case '/dashboard':
             case '/login':
             case '/register':
-                return [{ "to": "/", "name": "Home" }, { "to": "/blog", "name": "Blog" }, /*{ "to": "/IT-products", "name": "IT Products" }*/];
+                return [{ "to": "/", "name": "Home" }, { "to": "/blog", "name": "Blog" }, /*{ "to": "/IT-products", "name": "IT Products" }*/ checkAppState().isLoggedIn && { 'to': '/dashboard', 'name': "Dashboard" }];
             case '/blog':
             case '/hobbies':
             case '/IT':
                 return [{ "to": "/blog", "name": "blog" }, { "to": "/hobbies", "name": "Hobbies" }, { "to": "/IT", "name": "IT" }];
-            case '/dashboard':
-                return [{ "to": "/", "name": "Home" }]
         }
     }
 
