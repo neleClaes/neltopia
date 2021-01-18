@@ -1,4 +1,3 @@
-import { get } from 'lodash';
 import React, { useState } from 'react'
 
 import Input from './Input'

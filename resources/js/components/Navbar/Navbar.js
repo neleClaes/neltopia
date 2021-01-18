@@ -36,6 +36,7 @@ const Navbar = (props) => {
             case '/dashboard':
             case '/login':
             case '/register':
+            case '/email-verify':
                 return [{ "to": "/", "name": "Home" }, { "to": "/blog", "name": "Blog" }, /*{ "to": "/IT-products", "name": "IT Products" }*/ checkAppState().isLoggedIn && { 'to': '/dashboard', 'name': "Dashboard" }];
             case '/blog':
             case '/hobbies':

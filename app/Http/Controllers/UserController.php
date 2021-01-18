@@ -160,6 +160,22 @@ class UserController extends Controller
         }
     }
 
+    public function delete(Request $request)
+    {
+        try {
+            $user = User::Where('id', $request->only('id'))->delete();
+            return response()->json([
+                'succes' => true,
+                'user' => $user
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'succes' => false,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
     public function logout()
     {
         try {

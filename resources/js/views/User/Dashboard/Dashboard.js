@@ -1,60 +1,117 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, Component } from 'react'
+import { CSVLink } from 'react-csv'
+import { Redirect } from 'react-router-dom'
+
 import Form from '../../../components/Form/Form';
-import { User_Update } from '../../../api/User';
+import { User_Update, User_Delete } from '../../../api/User';
+import { get, isSafeInteger } from 'lodash';
+import { event } from 'jquery';
+
 const DashBoard = () => {
     const [isUpdate, setIsUpdate] = useState(false);
     const [showForm, setShowForm] = useState(false);
     const [error, SetError] = useState("");
     const [userUpdate, SetUserUpdate] = useState({});
+    const [userCSV, SetUserCSV] = useState({});
+    const [userDelete, setUserDelete] = useState(false);
+    const [isDeleted, setIsDeleted] = useState(false);
+
+
 
     const checkAppState = () => {
         const AppState = JSON.parse(localStorage["appState"]);
+
         return {
             isLoggedIn: AppState.isLoggedIn,
             user: AppState.user,
             hasEmailVerified: AppState.hasEmailVerified
         };
     }
-    const getUserInfo = (res) => {
+    const getUserInfo = (res, user = {}) => {
         console.log(res);
-        if (res.data.succes) {
-            const appState = {
-                isLoggedIn: true,
-                user: {
-                    id: userUpdate.id,
-                    name: userUpdate.username,
-                    email: userUpdate.email
-                },
-                hasEmailVerified: checkAppState.hasEmailVerified
-            };
+        if (Object.keys(user).length == 0) {
+            if (res.data.succes) {
+                const appState = {
+                    isLoggedIn: false,
+                    user: {},
+                    hasEmailVerified: false
+                };
 
-            localStorage["appState"] = JSON.stringify(appState);
-            location.reload();
+                localStorage["appState"] = JSON.stringify(appState);
+                setIsDeleted(true);
+            } else {
+                SetError(res.data.error);
+            }
         } else {
-            SetError(res.data.error);
-            SetUserUpdate({});
+            if (res.data.succes) {
+                const appState = {
+                    isLoggedIn: true,
+                    user: {
+                        id: user.id,
+                        name: user.username,
+                        email: user.email
+                    },
+                    hasEmailVerified: checkAppState.hasEmailVerified
+                };
+
+                localStorage["appState"] = JSON.stringify(appState);
+                location.reload();
+            } else {
+                SetError(res.data.error);
+                SetUserUpdate({});
+            }
         }
 
     }
 
     const handleUpdate = () => {
-        setShowForm(true);
+        setShowForm(1);
     }
 
-    const handleUser = (data) => {
-        if (Object.keys(userUpdate).length == 0) {
+    const handleDelete = () => {
+        setShowForm(2);
+    }
+
+    const handleUser = async (data) => {
+        if (data.user != undefined && Object.keys(userUpdate).length == 0) {
             let user = {
                 id: checkAppState().user.id,
                 username: data.username,
                 email: data.email,
                 password: data.password
             }
-            console.log(user);
             User_Update(getUserInfo, user);
             SetUserUpdate(user);
+        } else if (!userDelete) {
+            const AppState = JSON.parse(localStorage["appState"]);
+            setUserDelete(true);
+            User_Delete(getUserInfo, AppState.user.id);
+            // isDeleted.succes ? () => { localStorage["appState"] = {}; location.reload; } : SetError(isDeleted.res.data.error);
         }
     }
 
+
+    useEffect(() => {
+        if (Object.keys(userCSV).length == 0) {
+            const AppState = JSON.parse(localStorage["appState"]);
+            const user = AppState.user;
+
+            const headers = [
+                { label: "Username", key: "name" },
+                { label: "Email", key: "email" }
+            ]
+
+            const data = [
+                { name: user.name, email: user.email }
+            ]
+
+            SetUserCSV({
+                filename: `${user.name}.csv`,
+                headers: headers,
+                data: data
+            });
+        }
+    });
 
     return (
         <div className='form-container'>
@@ -75,9 +132,15 @@ const DashBoard = () => {
 
                 <button onClick={handleUpdate}>
                     Update User Data
-            </button>
+                </button>
+                {Object.keys(userCSV).length !== 0 && <CSVLink data={userCSV.data} filename={userCSV.filename} headers={userCSV.headers} >
+                    Get CSV file with your data
+                </CSVLink>}
+                <button onClick={handleDelete}>
+                    Delete account
+                </button>
             </div>
-            {showForm && <Form
+            {showForm == 1 && <Form
                 handleUser={handleUser}
                 name="update"
                 title="Update User Data"
@@ -92,7 +155,20 @@ const DashBoard = () => {
                 linkTo={false}
 
             />}
+            {showForm == 2 &&
+                <Form
+                    // getErrors={getErrors(errors)}
+                    handleUser={handleUser}
+                    name="delete"
+                    title="All your data will be removed. Are you sure you want to do this?"
+                    inputs={[]}
+                    button='Delete Account'
+                    link={false}
+                    linkTo={false}
+                />}
+            {isDeleted && <Redirect to="/logout" />}
         </div>
+
     )
 }
 export default DashBoard

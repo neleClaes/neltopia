@@ -31,6 +31,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware([checkHost::class])->post('/register', [UserController::class, 'register']);
         Route::middleware([checkHost::class])->get('/logout', [UserController::class, 'logout']);
         Route::middleware([checkHost::class])->post('/update', [UserController::class, 'update']);
+        Route::middleware([checkHost::class])->post('/delete', [UserController::class, 'delete']);
 
         Route::get('email/verify/{id}', [VerificationController::class, 'verify'])->name('verification.verify');
         Route::get('email/resend', [VerificationController::class, 'resend'])->name('verification.resend');

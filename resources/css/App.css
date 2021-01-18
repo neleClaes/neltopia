@@ -30,7 +30,7 @@ html, body {
 .home,
 .services,
 .products,
-.sign-up {
+.sign-up, .main{
   background-color: var(--cultured);
     flex: 1;
   align-items: center;

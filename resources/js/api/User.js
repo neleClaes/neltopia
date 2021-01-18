@@ -82,15 +82,36 @@ export const User_Update = async (getUserInfo, user) => {
                         }
                     });
 
-                    getUserInfo(res);
+                    getUserInfo(res, user);
 
                 } catch (error) {
                     console.log(error)
-                    getUserInfo(error);
+                    getUserInfo(error, user);
                 }
 
             });
         });
+    }).catch(err => console.log(err));
+}
+
+export const User_Delete = async (getUserInfo, id) => {
+    window.axios.defaults.withCredentials = true;
+    window.axios.get('sanctum/crf-cookie').then(async () => {
+        try {
+            const res = await window.axios({
+                method: 'post',
+                url: 'api/v1/auth/delete',
+                data: {
+                    id: id,
+                }
+            });
+
+            getUserInfo(res);
+
+        } catch (error) {
+            console.log(error)
+            getUserInfo(error);
+        }
     }).catch(err => console.log(err));
 }
 

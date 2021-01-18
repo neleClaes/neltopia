@@ -5594,6 +5594,7 @@ module.exports = __webpack_require__(/*! ./lib/axios */ "./node_modules/axios/li
 
 var utils = __webpack_require__(/*! ./../utils */ "./node_modules/axios/lib/utils.js");
 var settle = __webpack_require__(/*! ./../core/settle */ "./node_modules/axios/lib/core/settle.js");
+var cookies = __webpack_require__(/*! ./../helpers/cookies */ "./node_modules/axios/lib/helpers/cookies.js");
 var buildURL = __webpack_require__(/*! ./../helpers/buildURL */ "./node_modules/axios/lib/helpers/buildURL.js");
 var buildFullPath = __webpack_require__(/*! ../core/buildFullPath */ "./node_modules/axios/lib/core/buildFullPath.js");
 var parseHeaders = __webpack_require__(/*! ./../helpers/parseHeaders */ "./node_modules/axios/lib/helpers/parseHeaders.js");
@@ -5614,7 +5615,7 @@ module.exports = function xhrAdapter(config) {
     // HTTP basic authentication
     if (config.auth) {
       var username = config.auth.username || '';
-      var password = config.auth.password || '';
+      var password = config.auth.password ? unescape(encodeURIComponent(config.auth.password)) : '';
       requestHeaders.Authorization = 'Basic ' + btoa(username + ':' + password);
     }
 
@@ -5695,8 +5696,6 @@ module.exports = function xhrAdapter(config) {
     // This is only done if running in a standard browser environment.
     // Specifically not if we're in a web worker, or react-native.
     if (utils.isStandardBrowserEnv()) {
-      var cookies = __webpack_require__(/*! ./../helpers/cookies */ "./node_modules/axios/lib/helpers/cookies.js");
-
       // Add xsrf header
       var xsrfValue = (config.withCredentials || isURLSameOrigin(fullPath)) && config.xsrfCookieName ?
         cookies.read(config.xsrfCookieName) :
@@ -5762,7 +5761,7 @@ module.exports = function xhrAdapter(config) {
       });
     }
 
-    if (requestData === undefined) {
+    if (!requestData) {
       requestData = null;
     }
 
@@ -5830,6 +5829,9 @@ axios.all = function all(promises) {
   return Promise.all(promises);
 };
 axios.spread = __webpack_require__(/*! ./helpers/spread */ "./node_modules/axios/lib/helpers/spread.js");
+
+// Expose isAxiosError
+axios.isAxiosError = __webpack_require__(/*! ./helpers/isAxiosError */ "./node_modules/axios/lib/helpers/isAxiosError.js");
 
 module.exports = axios;
 
@@ -6039,9 +6041,10 @@ Axios.prototype.getUri = function getUri(config) {
 utils.forEach(['delete', 'get', 'head', 'options'], function forEachMethodNoData(method) {
   /*eslint func-names:0*/
   Axios.prototype[method] = function(url, config) {
-    return this.request(utils.merge(config || {}, {
+    return this.request(mergeConfig(config || {}, {
       method: method,
-      url: url
+      url: url,
+      data: (config || {}).data
     }));
   };
 });
@@ -6049,7 +6052,7 @@ utils.forEach(['delete', 'get', 'head', 'options'], function forEachMethodNoData
 utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
   /*eslint func-names:0*/
   Axios.prototype[method] = function(url, data, config) {
-    return this.request(utils.merge(config || {}, {
+    return this.request(mergeConfig(config || {}, {
       method: method,
       url: url,
       data: data
@@ -6309,7 +6312,7 @@ module.exports = function enhanceError(error, config, code, request, response) {
   error.response = response;
   error.isAxiosError = true;
 
-  error.toJSON = function() {
+  error.toJSON = function toJSON() {
     return {
       // Standard
       message: this.message,
@@ -6358,59 +6361,73 @@ module.exports = function mergeConfig(config1, config2) {
   config2 = config2 || {};
   var config = {};
 
-  var valueFromConfig2Keys = ['url', 'method', 'params', 'data'];
-  var mergeDeepPropertiesKeys = ['headers', 'auth', 'proxy'];
+  var valueFromConfig2Keys = ['url', 'method', 'data'];
+  var mergeDeepPropertiesKeys = ['headers', 'auth', 'proxy', 'params'];
   var defaultToConfig2Keys = [
-    'baseURL', 'url', 'transformRequest', 'transformResponse', 'paramsSerializer',
-    'timeout', 'withCredentials', 'adapter', 'responseType', 'xsrfCookieName',
-    'xsrfHeaderName', 'onUploadProgress', 'onDownloadProgress',
-    'maxContentLength', 'validateStatus', 'maxRedirects', 'httpAgent',
-    'httpsAgent', 'cancelToken', 'socketPath'
+    'baseURL', 'transformRequest', 'transformResponse', 'paramsSerializer',
+    'timeout', 'timeoutMessage', 'withCredentials', 'adapter', 'responseType', 'xsrfCookieName',
+    'xsrfHeaderName', 'onUploadProgress', 'onDownloadProgress', 'decompress',
+    'maxContentLength', 'maxBodyLength', 'maxRedirects', 'transport', 'httpAgent',
+    'httpsAgent', 'cancelToken', 'socketPath', 'responseEncoding'
   ];
+  var directMergeKeys = ['validateStatus'];
+
+  function getMergedValue(target, source) {
+    if (utils.isPlainObject(target) && utils.isPlainObject(source)) {
+      return utils.merge(target, source);
+    } else if (utils.isPlainObject(source)) {
+      return utils.merge({}, source);
+    } else if (utils.isArray(source)) {
+      return source.slice();
+    }
+    return source;
+  }
+
+  function mergeDeepProperties(prop) {
+    if (!utils.isUndefined(config2[prop])) {
+      config[prop] = getMergedValue(config1[prop], config2[prop]);
+    } else if (!utils.isUndefined(config1[prop])) {
+      config[prop] = getMergedValue(undefined, config1[prop]);
+    }
+  }
 
   utils.forEach(valueFromConfig2Keys, function valueFromConfig2(prop) {
-    if (typeof config2[prop] !== 'undefined') {
-      config[prop] = config2[prop];
+    if (!utils.isUndefined(config2[prop])) {
+      config[prop] = getMergedValue(undefined, config2[prop]);
     }
   });
 
-  utils.forEach(mergeDeepPropertiesKeys, function mergeDeepProperties(prop) {
-    if (utils.isObject(config2[prop])) {
-      config[prop] = utils.deepMerge(config1[prop], config2[prop]);
-    } else if (typeof config2[prop] !== 'undefined') {
-      config[prop] = config2[prop];
-    } else if (utils.isObject(config1[prop])) {
-      config[prop] = utils.deepMerge(config1[prop]);
-    } else if (typeof config1[prop] !== 'undefined') {
-      config[prop] = config1[prop];
-    }
-  });
+  utils.forEach(mergeDeepPropertiesKeys, mergeDeepProperties);
 
   utils.forEach(defaultToConfig2Keys, function defaultToConfig2(prop) {
-    if (typeof config2[prop] !== 'undefined') {
-      config[prop] = config2[prop];
-    } else if (typeof config1[prop] !== 'undefined') {
-      config[prop] = config1[prop];
+    if (!utils.isUndefined(config2[prop])) {
+      config[prop] = getMergedValue(undefined, config2[prop]);
+    } else if (!utils.isUndefined(config1[prop])) {
+      config[prop] = getMergedValue(undefined, config1[prop]);
+    }
+  });
+
+  utils.forEach(directMergeKeys, function merge(prop) {
+    if (prop in config2) {
+      config[prop] = getMergedValue(config1[prop], config2[prop]);
+    } else if (prop in config1) {
+      config[prop] = getMergedValue(undefined, config1[prop]);
     }
   });
 
   var axiosKeys = valueFromConfig2Keys
     .concat(mergeDeepPropertiesKeys)
-    .concat(defaultToConfig2Keys);
+    .concat(defaultToConfig2Keys)
+    .concat(directMergeKeys);
 
   var otherKeys = Object
-    .keys(config2)
+    .keys(config1)
+    .concat(Object.keys(config2))
     .filter(function filterAxiosKeys(key) {
       return axiosKeys.indexOf(key) === -1;
     });
 
-  utils.forEach(otherKeys, function otherKeysDefaultToConfig2(prop) {
-    if (typeof config2[prop] !== 'undefined') {
-      config[prop] = config2[prop];
-    } else if (typeof config1[prop] !== 'undefined') {
-      config[prop] = config1[prop];
-    }
-  });
+  utils.forEach(otherKeys, mergeDeepProperties);
 
   return config;
 };
@@ -6439,7 +6456,7 @@ var createError = __webpack_require__(/*! ./createError */ "./node_modules/axios
  */
 module.exports = function settle(resolve, reject, response) {
   var validateStatus = response.config.validateStatus;
-  if (!validateStatus || validateStatus(response.status)) {
+  if (!response.status || !validateStatus || validateStatus(response.status)) {
     resolve(response);
   } else {
     reject(createError(
@@ -6571,6 +6588,7 @@ var defaults = {
   xsrfHeaderName: 'X-XSRF-TOKEN',
 
   maxContentLength: -1,
+  maxBodyLength: -1,
 
   validateStatus: function validateStatus(status) {
     return status >= 200 && status < 300;
@@ -6634,7 +6652,6 @@ var utils = __webpack_require__(/*! ./../utils */ "./node_modules/axios/lib/util
 
 function encode(val) {
   return encodeURIComponent(val).
-    replace(/%40/gi, '@').
     replace(/%3A/gi, ':').
     replace(/%24/g, '$').
     replace(/%2C/gi, ',').
@@ -6815,6 +6832,29 @@ module.exports = function isAbsoluteURL(url) {
   // RFC 3986 defines scheme name as a sequence of characters beginning with a letter and followed
   // by any combination of letters, digits, plus, period, or hyphen.
   return /^([a-z][a-z\d\+\-\.]*:)?\/\//i.test(url);
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/helpers/isAxiosError.js":
+/*!********************************************************!*\
+  !*** ./node_modules/axios/lib/helpers/isAxiosError.js ***!
+  \********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+/**
+ * Determines whether the payload is an error thrown by Axios
+ *
+ * @param {*} payload The value to test
+ * @returns {boolean} True if the payload is an error thrown by Axios, otherwise false
+ */
+module.exports = function isAxiosError(payload) {
+  return (typeof payload === 'object') && (payload.isAxiosError === true);
 };
 
 
@@ -7144,6 +7184,21 @@ function isObject(val) {
 }
 
 /**
+ * Determine if a value is a plain Object
+ *
+ * @param {Object} val The value to test
+ * @return {boolean} True if value is a plain Object, otherwise false
+ */
+function isPlainObject(val) {
+  if (toString.call(val) !== '[object Object]') {
+    return false;
+  }
+
+  var prototype = Object.getPrototypeOf(val);
+  return prototype === null || prototype === Object.prototype;
+}
+
+/**
  * Determine if a value is a Date
  *
  * @param {Object} val The value to test
@@ -7299,34 +7354,12 @@ function forEach(obj, fn) {
 function merge(/* obj1, obj2, obj3, ... */) {
   var result = {};
   function assignValue(val, key) {
-    if (typeof result[key] === 'object' && typeof val === 'object') {
+    if (isPlainObject(result[key]) && isPlainObject(val)) {
       result[key] = merge(result[key], val);
-    } else {
-      result[key] = val;
-    }
-  }
-
-  for (var i = 0, l = arguments.length; i < l; i++) {
-    forEach(arguments[i], assignValue);
-  }
-  return result;
-}
-
-/**
- * Function equal to merge with the difference being that no reference
- * to original objects is kept.
- *
- * @see merge
- * @param {Object} obj1 Object to merge
- * @returns {Object} Result of all merge properties
- */
-function deepMerge(/* obj1, obj2, obj3, ... */) {
-  var result = {};
-  function assignValue(val, key) {
-    if (typeof result[key] === 'object' && typeof val === 'object') {
-      result[key] = deepMerge(result[key], val);
-    } else if (typeof val === 'object') {
-      result[key] = deepMerge({}, val);
+    } else if (isPlainObject(val)) {
+      result[key] = merge({}, val);
+    } else if (isArray(val)) {
+      result[key] = val.slice();
     } else {
       result[key] = val;
     }
@@ -7357,6 +7390,19 @@ function extend(a, b, thisArg) {
   return a;
 }
 
+/**
+ * Remove byte order marker. This catches EF BB BF (the UTF-8 BOM)
+ *
+ * @param {string} content with BOM
+ * @return {string} content value without BOM
+ */
+function stripBOM(content) {
+  if (content.charCodeAt(0) === 0xFEFF) {
+    content = content.slice(1);
+  }
+  return content;
+}
+
 module.exports = {
   isArray: isArray,
   isArrayBuffer: isArrayBuffer,
@@ -7366,6 +7412,7 @@ module.exports = {
   isString: isString,
   isNumber: isNumber,
   isObject: isObject,
+  isPlainObject: isPlainObject,
   isUndefined: isUndefined,
   isDate: isDate,
   isFile: isFile,
@@ -7376,9 +7423,9 @@ module.exports = {
   isStandardBrowserEnv: isStandardBrowserEnv,
   forEach: forEach,
   merge: merge,
-  deepMerge: deepMerge,
   extend: extend,
-  trim: trim
+  trim: trim,
+  stripBOM: stripBOM
 };
 
 
@@ -27985,7 +28032,7 @@ exports = module.exports = __webpack_require__(/*! ../../node_modules/css-loader
 
 
 // module
-exports.push([module.i, ":root{\n  --dark-purple: rgba(33, 11, 46, 1);\n  --dark-dark-purple: rgba(20,6,28,1);\n  --darkest-dark-purple: rgba(12,1,18,1);\n  --ruby-red: rgba(159, 29, 25, 1);\n  --bright-yellow-crayola: rgba(252, 171, 16, 1);\n  --middle-blue: rgba(146, 220, 229, 1);\n  --cultured: rgba(248, 247, 249, 1);\n}\n\n\n* {\n  box-sizing: border-box;\n  margin: 0;\n  padding: 0;\n  font-family: \"PT Sans\", sans-serif;\n}\n\nhtml, body {\n  background-color: var(--cultured);\n  min-height: 100vh;\n}\n\n#index {\n    min-height: 100vh;\n    display: flex;\n    flex-direction: column;\n}\n\n.home,\n.services,\n.products,\n.sign-up {\n  background-color: var(--cultured);\n    flex: 1;\n  align-items: center;\n  justify-content: center;\n  font-size: 3rem;\n}\n\n.services {\n  /* background-image: url(\"/images/img-2.jpg\"); */\n  background-position: center;\n  background-size: cover;\n  background-repeat: no-repeat;\n  color: #fff;\n  font-size: 100px;\n}\n\n.products {\n  /* background-image: url(\"/images/img-1.jpg\"); */\n  background-position: center;\n  background-size: fill;\n  background-repeat: no-repeat;\n  color: #fff;\n  font-size: 100px;\n}\n\n.sign-up {\n  /* background-image: url(\"/images/img-8.jpg\"); */\n  background-color: #242424;\n  /* background-position: center; */\n  background-size: cover;\n  /* background-repeat: no-repeat; */\n  color: #fff;\n  font-size: 100px;\n}\n\n.logo-1 {\n  height: 80px;\n}\n\n", ""]);
+exports.push([module.i, ":root{\n  --dark-purple: rgba(33, 11, 46, 1);\n  --dark-dark-purple: rgba(20,6,28,1);\n  --darkest-dark-purple: rgba(12,1,18,1);\n  --ruby-red: rgba(159, 29, 25, 1);\n  --bright-yellow-crayola: rgba(252, 171, 16, 1);\n  --middle-blue: rgba(146, 220, 229, 1);\n  --cultured: rgba(248, 247, 249, 1);\n}\n\n\n* {\n  box-sizing: border-box;\n  margin: 0;\n  padding: 0;\n  font-family: \"PT Sans\", sans-serif;\n}\n\nhtml, body {\n  background-color: var(--cultured);\n  min-height: 100vh;\n}\n\n#index {\n    min-height: 100vh;\n    display: flex;\n    flex-direction: column;\n}\n\n.home,\n.services,\n.products,\n.sign-up, .main{\n  background-color: var(--cultured);\n    flex: 1;\n  align-items: center;\n  justify-content: center;\n  font-size: 3rem;\n}\n\n.services {\n  /* background-image: url(\"/images/img-2.jpg\"); */\n  background-position: center;\n  background-size: cover;\n  background-repeat: no-repeat;\n  color: #fff;\n  font-size: 100px;\n}\n\n.products {\n  /* background-image: url(\"/images/img-1.jpg\"); */\n  background-position: center;\n  background-size: fill;\n  background-repeat: no-repeat;\n  color: #fff;\n  font-size: 100px;\n}\n\n.sign-up {\n  /* background-image: url(\"/images/img-8.jpg\"); */\n  background-color: #242424;\n  /* background-position: center; */\n  background-size: cover;\n  /* background-repeat: no-repeat; */\n  color: #fff;\n  font-size: 100px;\n}\n\n.logo-1 {\n  height: 80px;\n}\n\n", ""]);
 
 // exports
 
@@ -88433,6 +88480,490 @@ function randomFillSync (buf, offset, size) {
 
 /***/ }),
 
+/***/ "./node_modules/react-csv/index.js":
+/*!*****************************************!*\
+  !*** ./node_modules/react-csv/index.js ***!
+  \*****************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+module.exports = __webpack_require__(/*! ./lib/index.js */ "./node_modules/react-csv/lib/index.js");
+
+
+/***/ }),
+
+/***/ "./node_modules/react-csv/lib/components/Download.js":
+/*!***********************************************************!*\
+  !*** ./node_modules/react-csv/lib/components/Download.js ***!
+  \***********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _react = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+
+var _react2 = _interopRequireDefault(_react);
+
+var _core = __webpack_require__(/*! ../core */ "./node_modules/react-csv/lib/core.js");
+
+var _metaProps = __webpack_require__(/*! ../metaProps */ "./node_modules/react-csv/lib/metaProps.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var defaultProps = {
+  target: '_blank'
+};
+
+var CSVDownload = function (_React$Component) {
+  _inherits(CSVDownload, _React$Component);
+
+  function CSVDownload(props) {
+    _classCallCheck(this, CSVDownload);
+
+    var _this = _possibleConstructorReturn(this, (CSVDownload.__proto__ || Object.getPrototypeOf(CSVDownload)).call(this, props));
+
+    _this.state = {};
+    return _this;
+  }
+
+  _createClass(CSVDownload, [{
+    key: 'buildURI',
+    value: function buildURI() {
+      return _core.buildURI.apply(undefined, arguments);
+    }
+  }, {
+    key: 'componentDidMount',
+    value: function componentDidMount() {
+      var _props = this.props,
+          data = _props.data,
+          headers = _props.headers,
+          separator = _props.separator,
+          enclosingCharacter = _props.enclosingCharacter,
+          uFEFF = _props.uFEFF,
+          target = _props.target,
+          specs = _props.specs,
+          replace = _props.replace;
+
+      this.state.page = window.open(this.buildURI(data, uFEFF, headers, separator, enclosingCharacter), target, specs, replace);
+    }
+  }, {
+    key: 'getWindow',
+    value: function getWindow() {
+      return this.state.page;
+    }
+  }, {
+    key: 'render',
+    value: function render() {
+      return null;
+    }
+  }]);
+
+  return CSVDownload;
+}(_react2.default.Component);
+
+CSVDownload.defaultProps = Object.assign(_metaProps.defaultProps, defaultProps);
+CSVDownload.propTypes = _metaProps.propTypes;
+exports.default = CSVDownload;
+
+/***/ }),
+
+/***/ "./node_modules/react-csv/lib/components/Link.js":
+/*!*******************************************************!*\
+  !*** ./node_modules/react-csv/lib/components/Link.js ***!
+  \*******************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _react = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+
+var _react2 = _interopRequireDefault(_react);
+
+var _core = __webpack_require__(/*! ../core */ "./node_modules/react-csv/lib/core.js");
+
+var _metaProps = __webpack_require__(/*! ../metaProps */ "./node_modules/react-csv/lib/metaProps.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _objectWithoutProperties(obj, keys) { var target = {}; for (var i in obj) { if (keys.indexOf(i) >= 0) continue; if (!Object.prototype.hasOwnProperty.call(obj, i)) continue; target[i] = obj[i]; } return target; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var CSVLink = function (_React$Component) {
+  _inherits(CSVLink, _React$Component);
+
+  function CSVLink(props) {
+    _classCallCheck(this, CSVLink);
+
+    var _this = _possibleConstructorReturn(this, (CSVLink.__proto__ || Object.getPrototypeOf(CSVLink)).call(this, props));
+
+    _this.buildURI = _this.buildURI.bind(_this);
+    _this.state = { href: '' };
+    return _this;
+  }
+
+  _createClass(CSVLink, [{
+    key: 'componentDidMount',
+    value: function componentDidMount() {
+      var _props = this.props,
+          data = _props.data,
+          headers = _props.headers,
+          separator = _props.separator,
+          uFEFF = _props.uFEFF,
+          enclosingCharacter = _props.enclosingCharacter;
+
+      this.setState({ href: this.buildURI(data, uFEFF, headers, separator, enclosingCharacter) });
+    }
+  }, {
+    key: 'componentDidUpdate',
+    value: function componentDidUpdate(prevProps) {
+      if (this.props !== prevProps) {
+        var _props2 = this.props,
+            data = _props2.data,
+            headers = _props2.headers,
+            separator = _props2.separator,
+            uFEFF = _props2.uFEFF;
+
+        this.setState({ href: this.buildURI(data, uFEFF, headers, separator) });
+      }
+    }
+  }, {
+    key: 'buildURI',
+    value: function buildURI() {
+      return _core.buildURI.apply(undefined, arguments);
+    }
+  }, {
+    key: 'handleLegacy',
+    value: function handleLegacy(event) {
+      if (window.navigator.msSaveOrOpenBlob) {
+        event.preventDefault();
+
+        var _props3 = this.props,
+            data = _props3.data,
+            headers = _props3.headers,
+            separator = _props3.separator,
+            filename = _props3.filename,
+            enclosingCharacter = _props3.enclosingCharacter,
+            uFEFF = _props3.uFEFF;
+
+
+        var blob = new Blob([uFEFF ? '\uFEFF' : '', (0, _core.toCSV)(data, headers, separator, enclosingCharacter)]);
+        window.navigator.msSaveBlob(blob, filename);
+
+        return false;
+      }
+    }
+  }, {
+    key: 'handleAsyncClick',
+    value: function handleAsyncClick(event) {
+      var _this2 = this;
+
+      var done = function done(proceed) {
+        if (proceed === false) {
+          event.preventDefault();
+          return;
+        }
+        _this2.handleLegacy(event);
+      };
+
+      this.props.onClick(event, done);
+    }
+  }, {
+    key: 'handleSyncClick',
+    value: function handleSyncClick(event) {
+      var stopEvent = this.props.onClick(event) === false;
+      if (stopEvent) {
+        event.preventDefault();
+        return;
+      }
+      this.handleLegacy(event);
+    }
+  }, {
+    key: 'handleClick',
+    value: function handleClick() {
+      var _this3 = this;
+
+      return function (event) {
+        if (typeof _this3.props.onClick === 'function') {
+          return _this3.props.asyncOnClick ? _this3.handleAsyncClick(event) : _this3.handleSyncClick(event);
+        }
+        _this3.handleLegacy(event);
+      };
+    }
+  }, {
+    key: 'render',
+    value: function render() {
+      var _this4 = this;
+
+      var _props4 = this.props,
+          data = _props4.data,
+          headers = _props4.headers,
+          separator = _props4.separator,
+          filename = _props4.filename,
+          uFEFF = _props4.uFEFF,
+          children = _props4.children,
+          onClick = _props4.onClick,
+          asyncOnClick = _props4.asyncOnClick,
+          enclosingCharacter = _props4.enclosingCharacter,
+          rest = _objectWithoutProperties(_props4, ['data', 'headers', 'separator', 'filename', 'uFEFF', 'children', 'onClick', 'asyncOnClick', 'enclosingCharacter']);
+
+      return _react2.default.createElement(
+        'a',
+        _extends({
+          download: filename
+        }, rest, {
+          ref: function ref(link) {
+            return _this4.link = link;
+          },
+          target: '_self',
+          href: this.state.href,
+          onClick: this.handleClick()
+        }),
+        children
+      );
+    }
+  }]);
+
+  return CSVLink;
+}(_react2.default.Component);
+
+CSVLink.defaultProps = _metaProps.defaultProps;
+CSVLink.propTypes = _metaProps.propTypes;
+exports.default = CSVLink;
+
+/***/ }),
+
+/***/ "./node_modules/react-csv/lib/core.js":
+/*!********************************************!*\
+  !*** ./node_modules/react-csv/lib/core.js ***!
+  \********************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
+function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
+
+var isSafari = exports.isSafari = function isSafari() {
+  return (/^((?!chrome|android).)*safari/i.test(navigator.userAgent)
+  );
+};
+
+var isJsons = exports.isJsons = function isJsons(array) {
+  return Array.isArray(array) && array.every(function (row) {
+    return (typeof row === "undefined" ? "undefined" : _typeof(row)) === 'object' && !(row instanceof Array);
+  });
+};
+
+var isArrays = exports.isArrays = function isArrays(array) {
+  return Array.isArray(array) && array.every(function (row) {
+    return Array.isArray(row);
+  });
+};
+
+var jsonsHeaders = exports.jsonsHeaders = function jsonsHeaders(array) {
+  return Array.from(array.map(function (json) {
+    return Object.keys(json);
+  }).reduce(function (a, b) {
+    return new Set([].concat(_toConsumableArray(a), _toConsumableArray(b)));
+  }, []));
+};
+
+var jsons2arrays = exports.jsons2arrays = function jsons2arrays(jsons, headers) {
+  headers = headers || jsonsHeaders(jsons);
+
+  var headerLabels = headers;
+  var headerKeys = headers;
+  if (isJsons(headers)) {
+    headerLabels = headers.map(function (header) {
+      return header.label;
+    });
+    headerKeys = headers.map(function (header) {
+      return header.key;
+    });
+  }
+
+  var data = jsons.map(function (object) {
+    return headerKeys.map(function (header) {
+      return getHeaderValue(header, object);
+    });
+  });
+  return [headerLabels].concat(_toConsumableArray(data));
+};
+
+var getHeaderValue = exports.getHeaderValue = function getHeaderValue(property, obj) {
+  var foundValue = property.replace(/\[([^\]]+)]/g, ".$1").split(".").reduce(function (o, p, i, arr) {
+    if (o[p] === undefined) {
+      arr.splice(1);
+    } else {
+      return o[p];
+    }
+  }, obj);
+
+  return foundValue === undefined ? property in obj ? obj[property] : '' : foundValue;
+};
+
+var elementOrEmpty = exports.elementOrEmpty = function elementOrEmpty(element) {
+  return element || element === 0 ? element : '';
+};
+
+var joiner = exports.joiner = function joiner(data) {
+  var separator = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : ',';
+  var enclosingCharacter = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : '"';
+
+  return data.filter(function (e) {
+    return e;
+  }).map(function (row) {
+    return row.map(function (element) {
+      return elementOrEmpty(element);
+    }).map(function (column) {
+      return "" + enclosingCharacter + column + enclosingCharacter;
+    }).join(separator);
+  }).join("\n");
+};
+
+var arrays2csv = exports.arrays2csv = function arrays2csv(data, headers, separator, enclosingCharacter) {
+  return joiner(headers ? [headers].concat(_toConsumableArray(data)) : data, separator, enclosingCharacter);
+};
+
+var jsons2csv = exports.jsons2csv = function jsons2csv(data, headers, separator, enclosingCharacter) {
+  return joiner(jsons2arrays(data, headers), separator, enclosingCharacter);
+};
+
+var string2csv = exports.string2csv = function string2csv(data, headers, separator, enclosingCharacter) {
+  return headers ? headers.join(separator) + "\n" + data : data;
+};
+
+var toCSV = exports.toCSV = function toCSV(data, headers, separator, enclosingCharacter) {
+  if (isJsons(data)) return jsons2csv(data, headers, separator, enclosingCharacter);
+  if (isArrays(data)) return arrays2csv(data, headers, separator, enclosingCharacter);
+  if (typeof data === 'string') return string2csv(data, headers, separator);
+  throw new TypeError("Data should be a \"String\", \"Array of arrays\" OR \"Array of objects\" ");
+};
+
+var buildURI = exports.buildURI = function buildURI(data, uFEFF, headers, separator, enclosingCharacter) {
+  var csv = toCSV(data, headers, separator, enclosingCharacter);
+  var type = isSafari() ? 'application/csv' : 'text/csv';
+  var blob = new Blob([uFEFF ? "\uFEFF" : '', csv], { type: type });
+  var dataURI = "data:" + type + ";charset=utf-8," + (uFEFF ? "\uFEFF" : '') + csv;
+
+  var URL = window.URL || window.webkitURL;
+
+  return typeof URL.createObjectURL === 'undefined' ? dataURI : URL.createObjectURL(blob);
+};
+
+/***/ }),
+
+/***/ "./node_modules/react-csv/lib/index.js":
+/*!*********************************************!*\
+  !*** ./node_modules/react-csv/lib/index.js ***!
+  \*********************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.CSVLink = exports.CSVDownload = undefined;
+
+var _Download = __webpack_require__(/*! ./components/Download */ "./node_modules/react-csv/lib/components/Download.js");
+
+var _Download2 = _interopRequireDefault(_Download);
+
+var _Link = __webpack_require__(/*! ./components/Link */ "./node_modules/react-csv/lib/components/Link.js");
+
+var _Link2 = _interopRequireDefault(_Link);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var CSVDownload = exports.CSVDownload = _Download2.default;
+var CSVLink = exports.CSVLink = _Link2.default;
+
+/***/ }),
+
+/***/ "./node_modules/react-csv/lib/metaProps.js":
+/*!*************************************************!*\
+  !*** ./node_modules/react-csv/lib/metaProps.js ***!
+  \*************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.PropsNotForwarded = exports.defaultProps = exports.propTypes = undefined;
+
+var _react = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+
+var _react2 = _interopRequireDefault(_react);
+
+var _propTypes = __webpack_require__(/*! prop-types */ "./node_modules/prop-types/index.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var propTypes = exports.propTypes = {
+  data: (0, _propTypes.oneOfType)([_propTypes.string, _propTypes.array]).isRequired,
+  headers: _propTypes.array,
+  target: _propTypes.string,
+  separator: _propTypes.string,
+  filename: _propTypes.string,
+  uFEFF: _propTypes.bool,
+  onClick: _propTypes.func,
+  asyncOnClick: _propTypes.bool
+};
+
+var defaultProps = exports.defaultProps = {
+  separator: ',',
+  filename: 'generatedBy_react-csv.csv',
+  uFEFF: true,
+  asyncOnClick: false
+};
+
+var PropsNotForwarded = exports.PropsNotForwarded = ['data', 'headers'];
+
+/***/ }),
+
 /***/ "./node_modules/react-dom/cjs/react-dom.development.js":
 /*!*************************************************************!*\
   !*** ./node_modules/react-dom/cjs/react-dom.development.js ***!
@@ -124874,7 +125405,7 @@ var CheckPwd = /*#__PURE__*/function () {
 /*!**********************************!*\
   !*** ./resources/js/api/User.js ***!
   \**********************************/
-/*! exports provided: User_Registration, User_Login, User_Update, User_Logout */
+/*! exports provided: User_Registration, User_Login, User_Update, User_Delete, User_Logout */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -124882,6 +125413,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "User_Registration", function() { return User_Registration; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "User_Login", function() { return User_Login; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "User_Update", function() { return User_Update; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "User_Delete", function() { return User_Delete; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "User_Logout", function() { return User_Logout; });
 /* harmony import */ var _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @babel/runtime/regenerator */ "./node_modules/@babel/runtime/regenerator/index.js");
 /* harmony import */ var _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0__);
@@ -125094,7 +125626,7 @@ var User_Update = /*#__PURE__*/function () {
 
                                             case 4:
                                               res = _context7.sent;
-                                              getUserInfo(res);
+                                              getUserInfo(res, user);
                                               _context7.next = 12;
                                               break;
 
@@ -125102,7 +125634,7 @@ var User_Update = /*#__PURE__*/function () {
                                               _context7.prev = 8;
                                               _context7.t0 = _context7["catch"](1);
                                               console.log(_context7.t0);
-                                              getUserInfo(_context7.t0);
+                                              getUserInfo(_context7.t0, user);
 
                                             case 12:
                                             case "end":
@@ -125152,22 +125684,79 @@ var User_Update = /*#__PURE__*/function () {
     return _ref7.apply(this, arguments);
   };
 }();
-var User_Logout = /*#__PURE__*/function () {
-  var _ref11 = _asyncToGenerator( /*#__PURE__*/_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default.a.mark(function _callee11() {
-    var res, appState;
-    return _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default.a.wrap(function _callee11$(_context11) {
+var User_Delete = /*#__PURE__*/function () {
+  var _ref11 = _asyncToGenerator( /*#__PURE__*/_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default.a.mark(function _callee12(getUserInfo, id) {
+    return _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default.a.wrap(function _callee12$(_context12) {
       while (1) {
-        switch (_context11.prev = _context11.next) {
+        switch (_context12.prev = _context12.next) {
           case 0:
-            _context11.prev = 0;
-            _context11.next = 3;
+            window.axios.defaults.withCredentials = true;
+            window.axios.get('sanctum/crf-cookie').then( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default.a.mark(function _callee11() {
+              var res;
+              return _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default.a.wrap(function _callee11$(_context11) {
+                while (1) {
+                  switch (_context11.prev = _context11.next) {
+                    case 0:
+                      _context11.prev = 0;
+                      _context11.next = 3;
+                      return window.axios({
+                        method: 'post',
+                        url: 'api/v1/auth/delete',
+                        data: {
+                          id: id
+                        }
+                      });
+
+                    case 3:
+                      res = _context11.sent;
+                      getUserInfo(res);
+                      _context11.next = 11;
+                      break;
+
+                    case 7:
+                      _context11.prev = 7;
+                      _context11.t0 = _context11["catch"](0);
+                      console.log(_context11.t0);
+                      getUserInfo(_context11.t0);
+
+                    case 11:
+                    case "end":
+                      return _context11.stop();
+                  }
+                }
+              }, _callee11, null, [[0, 7]]);
+            })))["catch"](function (err) {
+              return console.log(err);
+            });
+
+          case 2:
+          case "end":
+            return _context12.stop();
+        }
+      }
+    }, _callee12);
+  }));
+
+  return function User_Delete(_x15, _x16) {
+    return _ref11.apply(this, arguments);
+  };
+}();
+var User_Logout = /*#__PURE__*/function () {
+  var _ref13 = _asyncToGenerator( /*#__PURE__*/_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default.a.mark(function _callee13() {
+    var res, appState;
+    return _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default.a.wrap(function _callee13$(_context13) {
+      while (1) {
+        switch (_context13.prev = _context13.next) {
+          case 0:
+            _context13.prev = 0;
+            _context13.next = 3;
             return window.axios({
               method: 'get',
               url: 'api/v1/auth/logout'
             });
 
           case 3:
-            res = _context11.sent;
+            res = _context13.sent;
 
             if (res.data.succes) {
               appState = {
@@ -125186,24 +125775,24 @@ var User_Logout = /*#__PURE__*/function () {
               location.replace('./');
             }
 
-            _context11.next = 10;
+            _context13.next = 10;
             break;
 
           case 7:
-            _context11.prev = 7;
-            _context11.t0 = _context11["catch"](0);
+            _context13.prev = 7;
+            _context13.t0 = _context13["catch"](0);
             location.replace('./');
 
           case 10:
           case "end":
-            return _context11.stop();
+            return _context13.stop();
         }
       }
-    }, _callee11, null, [[0, 7]]);
+    }, _callee13, null, [[0, 7]]);
   }));
 
   return function User_Logout() {
-    return _ref11.apply(this, arguments);
+    return _ref13.apply(this, arguments);
   };
 }();
 
@@ -125551,12 +126140,9 @@ function Input(_ref) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var lodash__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! lodash */ "./node_modules/lodash/lodash.js");
-/* harmony import */ var lodash__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(lodash__WEBPACK_IMPORTED_MODULE_0__);
-/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
-/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_1__);
-/* harmony import */ var _Input__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./Input */ "./resources/js/components/Form/Input.js");
-
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _Input__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./Input */ "./resources/js/components/Form/Input.js");
 
 
 
@@ -125570,7 +126156,7 @@ function Inputs(_ref) {
   };
 
   return inputs.map(function (input) {
-    return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement(_Input__WEBPACK_IMPORTED_MODULE_2__["default"], {
+    return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement(_Input__WEBPACK_IMPORTED_MODULE_1__["default"], {
       key: input.name,
       input: input,
       error: errors[input.name],
@@ -125873,6 +126459,7 @@ var Navbar = function Navbar(props) {
       case '/dashboard':
       case '/login':
       case '/register':
+      case '/email-verify':
         return [{
           "to": "/",
           "name": "Home"
@@ -126003,9 +126590,11 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
 
 
-function EmailVerify() {
-  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("h1", null, "Your Email needs to be verified before entering the content page"));
-}
+var EmailVerify = function EmailVerify() {
+  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("div", {
+    className: "main"
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("h1", null, "Your Email needs to be verified before entering the content page"));
+};
 
 /* harmony default export */ __webpack_exports__["default"] = (EmailVerify);
 
@@ -126023,10 +126612,12 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var react_router_dom__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react-router-dom */ "./node_modules/react-router-dom/esm/react-router-dom.js");
-/* harmony import */ var _components_Form_Form__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../components/Form/Form */ "./resources/js/components/Form/Form.js");
-/* harmony import */ var _api_User__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../../api/User */ "./resources/js/api/User.js");
-/* harmony import */ var _css_Form_css__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../../../../css/Form.css */ "./resources/css/Form.css");
-/* harmony import */ var _css_Form_css__WEBPACK_IMPORTED_MODULE_4___default = /*#__PURE__*/__webpack_require__.n(_css_Form_css__WEBPACK_IMPORTED_MODULE_4__);
+/* harmony import */ var lodash__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! lodash */ "./node_modules/lodash/lodash.js");
+/* harmony import */ var lodash__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(lodash__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony import */ var _components_Form_Form__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../../components/Form/Form */ "./resources/js/components/Form/Form.js");
+/* harmony import */ var _api_User__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../../../api/User */ "./resources/js/api/User.js");
+/* harmony import */ var _css_Form_css__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../../../../css/Form.css */ "./resources/css/Form.css");
+/* harmony import */ var _css_Form_css__WEBPACK_IMPORTED_MODULE_5___default = /*#__PURE__*/__webpack_require__.n(_css_Form_css__WEBPACK_IMPORTED_MODULE_5__);
 function _slicedToArray(arr, i) { return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _unsupportedIterableToArray(arr, i) || _nonIterableRest(); }
 
 function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
@@ -126038,6 +126629,7 @@ function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len 
 function _iterableToArrayLimit(arr, i) { if (typeof Symbol === "undefined" || !(Symbol.iterator in Object(arr))) return; var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"] != null) _i["return"](); } finally { if (_d) throw _e; } } return _arr; }
 
 function _arrayWithHoles(arr) { if (Array.isArray(arr)) return arr; }
+
 
 
 
@@ -126061,36 +126653,66 @@ var Login = function Login() {
       userLogin = _useState6[0],
       SetUserLogin = _useState6[1];
 
+  var _useState7 = Object(react__WEBPACK_IMPORTED_MODULE_0__["useState"])(0),
+      _useState8 = _slicedToArray(_useState7, 2),
+      loginAttempt = _useState8[0],
+      setLoginAttempt = _useState8[1];
+
+  var _useState9 = Object(react__WEBPACK_IMPORTED_MODULE_0__["useState"])(true),
+      _useState10 = _slicedToArray(_useState9, 2),
+      formActive = _useState10[0],
+      setfromActive = _useState10[1];
+
+  var emailIsVerified = function emailIsVerified(res) {
+    var appState = {
+      isLoggedIn: true,
+      user: {
+        id: res.data.user.id,
+        name: res.data.user.name,
+        email: res.data.user.email
+      },
+      hasEmailVerified: !(res.data.user.email_verified_at === null) ? true : false
+    };
+    localStorage["appState"] = JSON.stringify(appState);
+    SetIsLoggedIn(true);
+  };
+
+  var emailNotVerified = function emailNotVerified() {
+    SetError("verify your email!");
+  };
+
+  var formActivation = function formActivation() {
+    console.log('test');
+    setfromActive(true);
+    location.reload();
+  };
+
   var getUserInfo = function getUserInfo(res) {
     console.log(res);
 
     if (res.data.succes) {
-      var appState = {
-        isLoggedIn: true,
-        user: {
-          id: res.data.user.id,
-          name: res.data.user.name,
-          email: res.data.user.email
-        },
-        hasEmailVerified: !(res.data.user.email_verified_at === null) ? true : false
-      };
-      localStorage["appState"] = JSON.stringify(appState);
-      SetIsLoggedIn(true);
+      res.data.user.email_verified_at === null ? emailNotVerified : emailIsVerified(res);
     } else {
       SetError(res.data.error);
+      console.log(loginAttempt);
+
+      if (loginAttempt % 3 === 0 && loginAttempt >= 3) {
+        setfromActive(false);
+        Object(lodash__WEBPACK_IMPORTED_MODULE_2__["debounce"])(formActivation, loginAttempt * 100);
+      }
+
+      ;
     }
   };
 
-  Object(react__WEBPACK_IMPORTED_MODULE_0__["useEffect"])(function () {
-    if (!Object.keys(userLogin).length == 0) {
-      console.log(userLogin);
-      Object(_api_User__WEBPACK_IMPORTED_MODULE_3__["User_Login"])(getUserInfo, userLogin);
-    }
-  });
-
   var handleUser = function handleUser(data) {
-    console.log(data);
-    SetUserLogin(data);
+    if (data !== userLogin) {
+      console.log(data);
+      Object(_api_User__WEBPACK_IMPORTED_MODULE_4__["User_Login"])(getUserInfo, data);
+      SetUserLogin(data);
+      setLoginAttempt(loginAttempt + 1);
+      console.log(loginAttempt);
+    }
   };
 
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("div", {
@@ -126099,7 +126721,7 @@ var Login = function Login() {
     className: "form-container"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("div", {
     className: "form-content-left"
-  }, error && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("p", null, error)), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement(_components_Form_Form__WEBPACK_IMPORTED_MODULE_2__["default"] // getErrors={getErrors(errors)}
+  }, error && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("p", null, error)), formActive && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement(_components_Form_Form__WEBPACK_IMPORTED_MODULE_3__["default"] // getErrors={getErrors(errors)}
   , {
     handleUser: handleUser,
     name: "login",
@@ -126182,30 +126804,27 @@ function Register() {
     console.log(res);
 
     if (res.data.succes) {
-      var appState = {
-        isLoggedIn: true,
-        user: {
-          id: res.data.user.id,
-          name: res.data.user.name,
-          email: res.data.user.email
-        },
-        hasEmailVerified: false
-      };
-      localStorage["appState"] = JSON.stringify(appState);
+      // const appState = {
+      //     isLoggedIn: true,
+      //     user: {
+      //         id: res.data.user.id,
+      //         name: res.data.user.name,
+      //         email: res.data.user.email
+      //     },
+      //     hasEmailVerified: false
+      // };
+      // localStorage["appState"] = JSON.stringify(appState);
       setIsRegister(true);
     } else {
       SetError(res.data.error);
     }
   };
 
-  Object(react__WEBPACK_IMPORTED_MODULE_0__["useEffect"])(function () {
-    if (!Object.keys(userRegistration).length == 0) {
-      Object(_api_User__WEBPACK_IMPORTED_MODULE_4__["User_Registration"])(getUserInfo, userRegistration);
-    }
-  });
-
   var handleUser = function handleUser(data) {
-    SetUserRegistration(data);
+    if (Object.keys(userRegistration).length == 0) {
+      Object(_api_User__WEBPACK_IMPORTED_MODULE_4__["User_Registration"])(getUserInfo, data);
+      SetUserRegistration(data);
+    }
   };
 
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement(react__WEBPACK_IMPORTED_MODULE_0___default.a.Fragment, null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("div", {
@@ -126242,8 +126861,7 @@ function Register() {
     link: "Do not have an account? Sign up",
     linkTo: "/login"
   }), isRegisterd && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement(react_router_dom__WEBPACK_IMPORTED_MODULE_1__["Redirect"], {
-    to: "/",
-    message: "blub"
+    to: "/email-verify"
   })));
 }
 
@@ -126286,10 +126904,25 @@ function Home() {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
-/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
-/* harmony import */ var _components_Form_Form__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../components/Form/Form */ "./resources/js/components/Form/Form.js");
-/* harmony import */ var _api_User__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../api/User */ "./resources/js/api/User.js");
+/* harmony import */ var _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @babel/runtime/regenerator */ "./node_modules/@babel/runtime/regenerator/index.js");
+/* harmony import */ var _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony import */ var react_csv__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! react-csv */ "./node_modules/react-csv/index.js");
+/* harmony import */ var react_csv__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(react_csv__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony import */ var react_router_dom__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! react-router-dom */ "./node_modules/react-router-dom/esm/react-router-dom.js");
+/* harmony import */ var _components_Form_Form__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../../../components/Form/Form */ "./resources/js/components/Form/Form.js");
+/* harmony import */ var _api_User__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../../../api/User */ "./resources/js/api/User.js");
+/* harmony import */ var lodash__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! lodash */ "./node_modules/lodash/lodash.js");
+/* harmony import */ var lodash__WEBPACK_IMPORTED_MODULE_6___default = /*#__PURE__*/__webpack_require__.n(lodash__WEBPACK_IMPORTED_MODULE_6__);
+/* harmony import */ var jquery__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! jquery */ "./node_modules/jquery/dist/jquery.js");
+/* harmony import */ var jquery__WEBPACK_IMPORTED_MODULE_7___default = /*#__PURE__*/__webpack_require__.n(jquery__WEBPACK_IMPORTED_MODULE_7__);
+
+
+function asyncGeneratorStep(gen, resolve, reject, _next, _throw, key, arg) { try { var info = gen[key](arg); var value = info.value; } catch (error) { reject(error); return; } if (info.done) { resolve(value); } else { Promise.resolve(value).then(_next, _throw); } }
+
+function _asyncToGenerator(fn) { return function () { var self = this, args = arguments; return new Promise(function (resolve, reject) { var gen = fn.apply(self, args); function _next(value) { asyncGeneratorStep(gen, resolve, reject, _next, _throw, "next", value); } function _throw(err) { asyncGeneratorStep(gen, resolve, reject, _next, _throw, "throw", err); } _next(undefined); }); }; }
+
 function _slicedToArray(arr, i) { return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _unsupportedIterableToArray(arr, i) || _nonIterableRest(); }
 
 function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
@@ -126306,26 +126939,45 @@ function _arrayWithHoles(arr) { if (Array.isArray(arr)) return arr; }
 
 
 
+
+
+
+
 var DashBoard = function DashBoard() {
-  var _useState = Object(react__WEBPACK_IMPORTED_MODULE_0__["useState"])(false),
+  var _useState = Object(react__WEBPACK_IMPORTED_MODULE_1__["useState"])(false),
       _useState2 = _slicedToArray(_useState, 2),
       isUpdate = _useState2[0],
       setIsUpdate = _useState2[1];
 
-  var _useState3 = Object(react__WEBPACK_IMPORTED_MODULE_0__["useState"])(false),
+  var _useState3 = Object(react__WEBPACK_IMPORTED_MODULE_1__["useState"])(false),
       _useState4 = _slicedToArray(_useState3, 2),
       showForm = _useState4[0],
       setShowForm = _useState4[1];
 
-  var _useState5 = Object(react__WEBPACK_IMPORTED_MODULE_0__["useState"])(""),
+  var _useState5 = Object(react__WEBPACK_IMPORTED_MODULE_1__["useState"])(""),
       _useState6 = _slicedToArray(_useState5, 2),
       error = _useState6[0],
       SetError = _useState6[1];
 
-  var _useState7 = Object(react__WEBPACK_IMPORTED_MODULE_0__["useState"])({}),
+  var _useState7 = Object(react__WEBPACK_IMPORTED_MODULE_1__["useState"])({}),
       _useState8 = _slicedToArray(_useState7, 2),
       userUpdate = _useState8[0],
       SetUserUpdate = _useState8[1];
+
+  var _useState9 = Object(react__WEBPACK_IMPORTED_MODULE_1__["useState"])({}),
+      _useState10 = _slicedToArray(_useState9, 2),
+      userCSV = _useState10[0],
+      SetUserCSV = _useState10[1];
+
+  var _useState11 = Object(react__WEBPACK_IMPORTED_MODULE_1__["useState"])(false),
+      _useState12 = _slicedToArray(_useState11, 2),
+      userDelete = _useState12[0],
+      setUserDelete = _useState12[1];
+
+  var _useState13 = Object(react__WEBPACK_IMPORTED_MODULE_1__["useState"])(false),
+      _useState14 = _slicedToArray(_useState13, 2),
+      isDeleted = _useState14[0],
+      setIsDeleted = _useState14[1];
 
   var checkAppState = function checkAppState() {
     var AppState = JSON.parse(localStorage["appState"]);
@@ -126337,55 +126989,123 @@ var DashBoard = function DashBoard() {
   };
 
   var getUserInfo = function getUserInfo(res) {
+    var user = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
     console.log(res);
 
-    if (res.data.succes) {
-      var appState = {
-        isLoggedIn: true,
-        user: {
-          id: userUpdate.id,
-          name: userUpdate.username,
-          email: userUpdate.email
-        },
-        hasEmailVerified: checkAppState.hasEmailVerified
-      };
-      localStorage["appState"] = JSON.stringify(appState);
-      location.reload();
+    if (Object.keys(user).length == 0) {
+      if (res.data.succes) {
+        var appState = {
+          isLoggedIn: false,
+          user: {},
+          hasEmailVerified: false
+        };
+        localStorage["appState"] = JSON.stringify(appState);
+        setIsDeleted(true);
+      } else {
+        SetError(res.data.error);
+      }
     } else {
-      SetError(res.data.error);
-      SetUserUpdate({});
+      if (res.data.succes) {
+        var _appState = {
+          isLoggedIn: true,
+          user: {
+            id: user.id,
+            name: user.username,
+            email: user.email
+          },
+          hasEmailVerified: checkAppState.hasEmailVerified
+        };
+        localStorage["appState"] = JSON.stringify(_appState);
+        location.reload();
+      } else {
+        SetError(res.data.error);
+        SetUserUpdate({});
+      }
     }
   };
 
   var handleUpdate = function handleUpdate() {
-    setShowForm(true);
+    setShowForm(1);
   };
 
-  var handleUser = function handleUser(data) {
-    if (Object.keys(userUpdate).length == 0) {
-      var user = {
-        id: checkAppState().user.id,
-        username: data.username,
-        email: data.email,
-        password: data.password
-      };
-      console.log(user);
-      Object(_api_User__WEBPACK_IMPORTED_MODULE_2__["User_Update"])(getUserInfo, user);
-      SetUserUpdate(user);
+  var handleDelete = function handleDelete() {
+    setShowForm(2);
+  };
+
+  var handleUser = /*#__PURE__*/function () {
+    var _ref = _asyncToGenerator( /*#__PURE__*/_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default.a.mark(function _callee(data) {
+      var user, AppState;
+      return _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_0___default.a.wrap(function _callee$(_context) {
+        while (1) {
+          switch (_context.prev = _context.next) {
+            case 0:
+              if (data.user != undefined && Object.keys(userUpdate).length == 0) {
+                user = {
+                  id: checkAppState().user.id,
+                  username: data.username,
+                  email: data.email,
+                  password: data.password
+                };
+                Object(_api_User__WEBPACK_IMPORTED_MODULE_5__["User_Update"])(getUserInfo, user);
+                SetUserUpdate(user);
+              } else if (!userDelete) {
+                AppState = JSON.parse(localStorage["appState"]);
+                setUserDelete(true);
+                Object(_api_User__WEBPACK_IMPORTED_MODULE_5__["User_Delete"])(getUserInfo, AppState.user.id); // isDeleted.succes ? () => { localStorage["appState"] = {}; location.reload; } : SetError(isDeleted.res.data.error);
+              }
+
+            case 1:
+            case "end":
+              return _context.stop();
+          }
+        }
+      }, _callee);
+    }));
+
+    return function handleUser(_x) {
+      return _ref.apply(this, arguments);
+    };
+  }();
+
+  Object(react__WEBPACK_IMPORTED_MODULE_1__["useEffect"])(function () {
+    if (Object.keys(userCSV).length == 0) {
+      var AppState = JSON.parse(localStorage["appState"]);
+      var user = AppState.user;
+      var headers = [{
+        label: "Username",
+        key: "name"
+      }, {
+        label: "Email",
+        key: "email"
+      }];
+      var data = [{
+        name: user.name,
+        email: user.email
+      }];
+      SetUserCSV({
+        filename: "".concat(user.name, ".csv"),
+        headers: headers,
+        data: data
+      });
     }
-  };
-
-  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("div", {
+  });
+  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement("div", {
     className: "form-container"
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("div", {
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement("div", {
     className: "form-content-left"
-  }, error && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("p", null, error), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("table", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("tbody", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("tr", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("th", {
+  }, error && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement("p", null, error), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement("table", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement("tbody", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement("tr", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement("th", {
     scope: "row "
-  }, "Username"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("td", null, checkAppState().user.name)), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("tr", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("th", {
+  }, "Username"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement("td", null, checkAppState().user.name)), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement("tr", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement("th", {
     scope: "row "
-  }, "Email"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("td", null, checkAppState().user.email)))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("button", {
+  }, "Email"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement("td", null, checkAppState().user.email)))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement("button", {
     onClick: handleUpdate
-  }, "Update User Data")), showForm && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement(_components_Form_Form__WEBPACK_IMPORTED_MODULE_1__["default"], {
+  }, "Update User Data"), Object.keys(userCSV).length !== 0 && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement(react_csv__WEBPACK_IMPORTED_MODULE_2__["CSVLink"], {
+    data: userCSV.data,
+    filename: userCSV.filename,
+    headers: userCSV.headers
+  }, "Get CSV file with your data"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement("button", {
+    onClick: handleDelete
+  }, "Delete account")), showForm == 1 && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement(_components_Form_Form__WEBPACK_IMPORTED_MODULE_4__["default"], {
     handleUser: handleUser,
     name: "update",
     title: "Update User Data",
@@ -126413,6 +127133,17 @@ var DashBoard = function DashBoard() {
     button: "Update",
     link: false,
     linkTo: false
+  }), showForm == 2 && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement(_components_Form_Form__WEBPACK_IMPORTED_MODULE_4__["default"] // getErrors={getErrors(errors)}
+  , {
+    handleUser: handleUser,
+    name: "delete",
+    title: "All your data will be removed. Are you sure you want to do this?",
+    inputs: [],
+    button: "Delete Account",
+    link: false,
+    linkTo: false
+  }), isDeleted && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement(react_router_dom__WEBPACK_IMPORTED_MODULE_3__["Redirect"], {
+    to: "/logout"
   }));
 };
 

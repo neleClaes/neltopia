@@ -13,17 +13,17 @@ function Register() {
     const getUserInfo = (res) => {
         console.log(res);
         if (res.data.succes) {
-            const appState = {
-                isLoggedIn: true,
-                user: {
-                    id: res.data.user.id,
-                    name: res.data.user.name,
-                    email: res.data.user.email
-                },
-                hasEmailVerified: false
-            };
+            // const appState = {
+            //     isLoggedIn: true,
+            //     user: {
+            //         id: res.data.user.id,
+            //         name: res.data.user.name,
+            //         email: res.data.user.email
+            //     },
+            //     hasEmailVerified: false
+            // };
 
-            localStorage["appState"] = JSON.stringify(appState);
+            // localStorage["appState"] = JSON.stringify(appState);
 
             setIsRegister(true)
         } else {
@@ -32,14 +32,12 @@ function Register() {
 
     }
 
-    useEffect(() => {
-        if (!Object.keys(userRegistration).length == 0) {
-            User_Registration(getUserInfo, userRegistration);
-        }
-    });
-
     const handleUser = (data) => {
-        SetUserRegistration(data);
+        if (Object.keys(userRegistration).length == 0) {
+            User_Registration(getUserInfo, data);
+            SetUserRegistration(data)
+        }
+
     }
 
 
@@ -65,7 +63,7 @@ function Register() {
                     link='Do not have an account? Sign up'
                     linkTo="/login"
                 />
-                {isRegisterd && <Redirect to="/" message="blub" />}
+                {isRegisterd && <Redirect to="/email-verify" />}
             </div>
         </>
     )
